@@ -108,10 +108,8 @@ function custom_facebook_feed_charlie() {
         return;
     }
 
-    //debug_to_console('Access Token: ' . $access_token);
-    
     // URL del endpoint de la API de Facebook para obtener el feed
-    $api_url = 'https://graph.facebook.com/v19.0/' . $page_id . '?fields=feed{created_time,attachments,message,from}&access_token=' . $access_token;
+    $api_url = 'https://graph.facebook.com/v19.0/' . $page_id . '?fields=feed{created_time,attachments,message,from,likes.limit(1).summary(true),comments.limit(1).summary(true)}&access_token=' . $access_token;
 
     // Realizar la solicitud GET
     $response = wp_remote_get($api_url);
@@ -144,11 +142,38 @@ function custom_facebook_feed_charlie() {
                         }
                     }
                 }
+
+                // Mostrar el número de likes y comentarios
+                echo '<div class="likes-comments">';
+                echo '<p class="likes">Likes: ' . $post['likes']['summary']['total_count'] . '</p>';
+                echo '<p class="comments">Comentarios: ' . $post['comments']['summary']['total_count'] . '</p>';
+                echo '</div>'; // Cierre de likes-comments
                 
                 // Mostrar la información del autor y la fecha
                 echo '<div class="author-info">';
                 echo '<p class="author">' . $post['from']['name'] . '</p>';
-                echo '<p class="created-time">' . date("F j, Y, g:i a", strtotime($post['created_time'])) . '</p>';
+                
+                // Calcular el tiempo transcurrido desde la publicación
+                $created_time = new DateTime($post['created_time']);
+                $current_time = new DateTime();
+                $interval = $current_time->diff($created_time);
+                $elapsed = '';
+
+                if ($interval->y > 0) {
+                    $elapsed = $interval->format('%y años');
+                } elseif ($interval->m > 0) {
+                    $elapsed = $interval->format('%m meses');
+                } elseif ($interval->d > 0) {
+                    $elapsed = $interval->format('%d días');
+                } elseif ($interval->h > 0) {
+                    $elapsed = $interval->format('%h horas');
+                } elseif ($interval->i > 0) {
+                    $elapsed = $interval->format('%i minutos');
+                } else {
+                    $elapsed = $interval->format('%s segundos');
+                }
+
+                echo '<p class="created-time">Hace ' . $elapsed . '</p>';
                 echo '</div>'; // Cierre de author-info
                 
                 echo '</div>'; // Cierre de post
