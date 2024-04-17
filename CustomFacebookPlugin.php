@@ -17,6 +17,7 @@ function my_plugin_register_settings() {
 
     // Registra una opción para la page_id
     register_setting('my_plugin_options', 'my_plugin_page_id');
+    register_setting('my_plugin_options', 'my_plugin_app_id');
 }
 add_action('admin_init', 'my_plugin_register_settings');
 
@@ -47,12 +48,28 @@ function my_plugin_render_options_page() {
                     <th scope="row">Page ID:</th>
                     <td><input type="text" name="my_plugin_page_id" value="<?php echo esc_attr(get_option('my_plugin_page_id')); ?>" /></td>
                 </tr>
+                <tr valign="top">
+                    <th scope="row">App ID:</th>
+                    <td><input type="text" name="my_plugin_app_id" value="<?php echo esc_attr(get_option('my_plugin_app_id')); ?>" /></td>
+                </tr>
             </table>
             <?php submit_button(); ?>
         </form>
     </div>
     <?php
 }
+
+// Función para agregar scripts al frontend
+function agregar_scripts_facebook() {
+    // Agregar el SDK de JavaScript de Facebook
+    wp_enqueue_script('facebook-sdk', 'https://connect.facebook.net/en_US/sdk.js');
+
+}
+add_action('wp_enqueue_scripts', 'agregar_scripts_facebook');
+ 
+
+// Función de acción para agregar el CSS personalizado
+add_action( 'wp_enqueue_scripts', 'agregar_css_personalizado' );
 
 function debug_to_console($data) {
     $output = $data;
@@ -96,7 +113,6 @@ function my_plugin_make_request() {
     }
 }
 
-
 function custom_facebook_feed_charlie() {
     // Obtener la ID de la página y el token de acceso desde los ajustes
     $page_id = get_option('my_plugin_page_id');
@@ -109,8 +125,8 @@ function custom_facebook_feed_charlie() {
     }
 
     // URL del endpoint de la API de Facebook para obtener el feed
-    $api_url = 'https://graph.facebook.com/v19.0/' . $page_id . '?fields=feed{created_time,attachments,message,from,likes.limit(1).summary(true),comments.limit(1).summary(true)}&access_token=' . $access_token;
-
+    //$api_url = 'https://graph.facebook.com/v19.0/' . $page_id . '?fields=feed{created_time,attachments,message,from,likes.limit(1).summary(true),comments.limit(1).summary(true)}&access_token=' . $access_token;
+    $api_url = 'https://graph.facebook.com/v19.0/' . $page_id . '/feed?fields=permalink_url';
     // Realizar la solicitud GET
     $response = wp_remote_get($api_url);
 
@@ -119,67 +135,23 @@ function custom_facebook_feed_charlie() {
         // Decodificar la respuesta JSON
         $page_data = json_decode(wp_remote_retrieve_body($response), true);
 
-        // Verificar si hay datos de feed disponibles
-        if(isset($page_data['feed']['data'])) {
-            $feed_data = $page_data['feed']['data'];
+        // Verificar si hay datos disponibles
+        if(isset($page_data['data'])) {
+            $feed_data = $page_data['data'];
 
-            // Iterar sobre las publicaciones y mostrarlas
+            // Iterar sobre los datos y mostrarlos
             foreach ($feed_data as $post) {
-                echo '<div class="post">';
-                
-                // Verificar si la publicación tiene un mensaje
-                if(isset($post['message'])) {
-                    echo '<p class="message">' . $post['message'] . '</p>';
-                }
-                
-                // Verificar si la publicación tiene un adjunto
-                if(isset($post['attachments'])) {
-                    foreach($post['attachments']['data'] as $attachment) {
-                        if($attachment['type'] == 'photo') {
-                            echo '<img src="' . $attachment['media']['image']['src'] . '" class="attachment">';
-                        } elseif ($attachment['type'] == 'link') {
-                            echo '<a href="' . $attachment['url'] . '" class="link">' . $attachment['title'] . '</a>';
-                        }
-                    }
-                }
+                // Verificar si existe el permalink_url
+                if(isset($post['permalink_url'])) {
+                    // Construir el enlace del post de Facebook
+                    $permalink_url = esc_url($post['permalink_url']);
 
-                // Mostrar el número de likes y comentarios
-                echo '<div class="likes-comments">';
-                echo '<p class="likes">Likes: ' . $post['likes']['summary']['total_count'] . '</p>';
-                echo '<p class="comments">Comentarios: ' . $post['comments']['summary']['total_count'] . '</p>';
-                echo '</div>'; // Cierre de likes-comments
-                
-                // Mostrar la información del autor y la fecha
-                echo '<div class="author-info">';
-                echo '<p class="author">' . $post['from']['name'] . '</p>';
-                
-                // Calcular el tiempo transcurrido desde la publicación
-                $created_time = new DateTime($post['created_time']);
-                $current_time = new DateTime();
-                $interval = $current_time->diff($created_time);
-                $elapsed = '';
-
-                if ($interval->y > 0) {
-                    $elapsed = $interval->format('%y años');
-                } elseif ($interval->m > 0) {
-                    $elapsed = $interval->format('%m meses');
-                } elseif ($interval->d > 0) {
-                    $elapsed = $interval->format('%d días');
-                } elseif ($interval->h > 0) {
-                    $elapsed = $interval->format('%h horas');
-                } elseif ($interval->i > 0) {
-                    $elapsed = $interval->format('%i minutos');
-                } else {
-                    $elapsed = $interval->format('%s segundos');
+                    // Generar el elemento HTML del post de Facebook
+                    echo '<div class="fb-post" data-href="' . $permalink_url . '" data-width="500"></div>';
                 }
-
-                echo '<p class="created-time">Hace ' . $elapsed . '</p>';
-                echo '</div>'; // Cierre de author-info
-                
-                echo '</div>'; // Cierre de post
             }
         } else {
-            // Manejar el caso en que no haya datos de feed disponibles
+            // Manejar el caso en que no haya datos disponibles
             echo '<div class="notice notice-warning"><p>No se encontraron publicaciones en el feed de Facebook.</p></div>';
         }
     } else {
